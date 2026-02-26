@@ -1,0 +1,7 @@
+{
+    "name": "ministra",
+    "version": "1.0.0",
+    "description": "Ministra/Stalker Portal middleware for MAG devices",
+    "requires_core": ">=1.0",
+    "dependencies": []
+}

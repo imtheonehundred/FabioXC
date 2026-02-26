@@ -1,0 +1,7 @@
+{
+    "name": "theft-detection",
+    "version": "1.0.0",
+    "description": "Anti-piracy restream detection and alerting",
+    "requires_core": ">=1.0",
+    "dependencies": []
+}

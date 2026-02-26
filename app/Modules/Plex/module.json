@@ -1,0 +1,7 @@
+{
+    "name": "plex",
+    "version": "1.0.0",
+    "description": "Plex Media Server integration for importing VOD content",
+    "requires_core": ">=1.0",
+    "dependencies": []
+}

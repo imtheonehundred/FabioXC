@@ -1,0 +1,7 @@
+{
+    "name": "magscan",
+    "version": "1.0.0",
+    "description": "MAG device network scanning and discovery",
+    "requires_core": ">=1.0",
+    "dependencies": []
+}

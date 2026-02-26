@@ -1,0 +1,7 @@
+{
+    "name": "fingerprint",
+    "version": "1.0.0",
+    "description": "Watermark fingerprinting for stream piracy tracking",
+    "requires_core": ">=1.0",
+    "dependencies": []
+}

@@ -1,0 +1,7 @@
+{
+    "name": "tmdb",
+    "version": "1.0.0",
+    "description": "TMDB metadata fetching for movies and series",
+    "requires_core": ">=1.0",
+    "dependencies": []
+}

@@ -2,6 +2,8 @@
 
 Laravel-based IPTV admin panel with **Player API** (Xtream Codes–compatible), **live restreaming** (FFmpeg HLS), **VOD**, **series**, **catch-up/timeshift**, and **reseller API**. Built with Laravel 12, Inertia.js, and Vue 3.
 
+**Architecture:** This project follows the structure and engine described in [ARCHITECTURE.md](ARCHITECTURE.md) (domain, streaming, modules, lightweight streaming bootstrap). For a direct A–Z mapping of that doc to this repo, see **[ARCHITECTURE-COMPLIANCE.md](ARCHITECTURE-COMPLIANCE.md)**.
+
 ---
 
 ## Requirements

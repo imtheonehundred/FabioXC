@@ -10,6 +10,28 @@ use App\Domain\Vod\Models\Series;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use App\Modules\Core\ModuleLoader;
+
+// Module crons (ARCHITECTURE §6, §3.7) — from config/modules.php
+$moduleLoader = app(ModuleLoader::class);
+foreach ($moduleLoader->getAllCrons() as $cron) {
+    $schedule = $cron['schedule'] ?? 'hourly';
+    $command = $cron['command'] ?? '';
+    if ($command === '') continue;
+    $event = Schedule::command($command)->withoutOverlapping();
+    match ($schedule) {
+        'everyMinute' => $event->everyMinute(),
+        'everyFiveMinutes' => $event->everyFiveMinutes(),
+        'everyTenMinutes' => $event->everyTenMinutes(),
+        'everyFifteenMinutes' => $event->everyFifteenMinutes(),
+        'everyThirtyMinutes' => $event->everyThirtyMinutes(),
+        'hourly' => $event->hourly(),
+        'daily' => $event->daily(),
+        'weekly' => $event->weekly(),
+        'monthly' => $event->monthly(),
+        default => $event->hourly(),
+    };
+}
 
 // Streams Cron — check stream health, restart failed ones
 Schedule::call(function () {

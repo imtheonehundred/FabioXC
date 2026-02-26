@@ -1,47 +1,53 @@
-# Build MAIN (full) and LB (streaming-only) from the same codebase (ARCHITECTURE.md §8).
-# Usage: make new   -> prepare full build
-#        make lb    -> prepare LB build (excludes admin UI, reseller, optional modules)
+# IPTV Panel — MAIN vs LB build (ARCHITECTURE.md §8)
+#
+# MAIN: full app (admin + streaming + modules). Default.
+# LB:   streaming-only node (no admin UI, no reseller, minimal domain).
+#
+# Usage:
+#   make install   # Composer + npm deps (MAIN)
+#   make build    # Frontend build
+#   make lb       # Create LB manifest (build/lb-manifest.txt) and build/lb/ stub
 
-MAIN_DIR ?= .
-TEMP_DIR ?= /tmp/iptv_build
-LB_DIR   ?= $(TEMP_DIR)/lb
+SHELL := /bin/bash
+APP_ROOT ?= $(CURDIR)
+BUILD_DIR := $(APP_ROOT)/build
+LB_DIR := $(BUILD_DIR)/lb
 
-# Directories to include in MAIN build
-MAIN_FILES = app bootstrap config database public resources routes storage/lang lang infrastructure
+.PHONY: install build lb lb-dirs clean
 
-# For LB build: same as MAIN but we remove admin-only parts after copy
-LB_FILES = app bootstrap config database public resources routes storage/lang lang infrastructure
+# Full install (MAIN)
+install:
+	composer install --no-dev --optimize-autoloader
+	npm ci
 
-# Directories/files to remove for LB (streaming-only node)
-LB_DIRS_TO_REMOVE = \
-	app/Http/Controllers/Admin \
-	app/Http/Controllers/Reseller \
-	app/Http/Middleware/HandleInertiaRequests.php \
-	resources/js/Pages/Admin \
-	resources/js/Pages/Reseller \
-	resources/js/Layouts/AdminLayout.vue \
-	resources/js/Layouts/ResellerLayout.vue
+# Frontend build
+build:
+	npm run build
 
-.PHONY: new lb clean
+# LB: create manifest and optional stub tree for streaming-only deploy
+# LB node runs same codebase but only streaming entrypoints (public/stream.php, streaming routes)
+# and crons that support streaming (streams, servers, cache). Admin routes not mounted.
+lb: lb-dirs
+	@echo "LB manifest and $(LB_DIR) created. For LB node: deploy full repo, point nginx to stream.php only, run schedule:run with env APP_CONTEXT=streaming (optional)."
 
-new:
-	@echo "==> MAIN build: $(MAIN_DIR)"
-	@mkdir -p $(TEMP_DIR)/main
-	@for d in $(MAIN_FILES); do \
-		if [ -d "$(MAIN_DIR)/$$d" ]; then cp -R "$(MAIN_DIR)/$$d" "$(TEMP_DIR)/main/"; fi; \
-		if [ -f "$(MAIN_DIR)/$$d" ]; then cp "$(MAIN_DIR)/$$d" "$(TEMP_DIR)/main/"; fi; \
-	done
-	@echo "==> MAIN build ready in $(TEMP_DIR)/main"
+lb-dirs: $(BUILD_DIR)
+	@mkdir -p $(LB_DIR)
+	@echo "# Paths needed on LB (streaming-only) node. Deploy these + Laravel base (bootstrap, config, storage, vendor, public)." > $(BUILD_DIR)/lb-manifest.txt
+	@echo "app/Streaming" >> $(BUILD_DIR)/lb-manifest.txt
+	@echo "app/Domain/Stream" >> $(BUILD_DIR)/lb-manifest.txt
+	@echo "app/Domain/Server" >> $(BUILD_DIR)/lb-manifest.txt
+	@echo "app/Domain/Line" >> $(BUILD_DIR)/lb-manifest.txt
+	@echo "app/Domain/Vod" >> $(BUILD_DIR)/lb-manifest.txt
+	@echo "app/Domain/Bouquet" >> $(BUILD_DIR)/lb-manifest.txt
+	@echo "app/Domain/Security" >> $(BUILD_DIR)/lb-manifest.txt
+	@echo "app/Infrastructure/Nginx" >> $(BUILD_DIR)/lb-manifest.txt
+	@echo "config/streaming.php" >> $(BUILD_DIR)/lb-manifest.txt
+	@echo "public/stream.php" >> $(BUILD_DIR)/lb-manifest.txt
+	@echo "routes/streaming.php" >> $(BUILD_DIR)/lb-manifest.txt
+	@echo "Laravel: bootstrap, config, storage, vendor, public (all); exclude admin-only modules if desired." >> $(BUILD_DIR)/lb-manifest.txt
 
-lb: new
-	@echo "==> LB build: stripping admin/reseller"
-	@rm -rf $(LB_DIR)
-	@cp -R $(TEMP_DIR)/main $(LB_DIR)
-	@for d in $(LB_DIRS_TO_REMOVE); do \
-		rm -rf "$(LB_DIR)/$$d"; \
-	done
-	@echo "==> LB build ready in $(LB_DIR)"
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
 
 clean:
-	@rm -rf $(TEMP_DIR)
-	@echo "==> Cleaned $(TEMP_DIR)"
+	rm -rf $(BUILD_DIR)

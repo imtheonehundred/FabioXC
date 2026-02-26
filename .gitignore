@@ -24,3 +24,4 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 database/database.sqlite
+scripts/run-deploy-vps.exp

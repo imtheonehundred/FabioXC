@@ -4,8 +4,7 @@ namespace App\Streaming\Delivery;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\StreamedResponse;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Serves live streams — HLS playlists, TS segments, RTMP redirects.
@@ -32,23 +31,33 @@ class LiveDelivery
         };
     }
 
-    private function serveHls(array $stream, array $line, Request $request): StreamedResponse
+    private function serveHls(array $stream, array $line, Request $request): Response
     {
         $streamId = $stream['id'];
-        $serverId = $stream['server_id'] ?? 1;
 
-        $server = DB::table('servers')->find($serverId);
-        $baseUrl = $server ? ($server->domain_name ?: $server->server_ip) : 'localhost';
-        $port = $server->http_port ?? 80;
+        // Use the same host/port as the request so segment URLs work when opening from browser
+        $segmentBase = $request->getSchemeAndHttpHost() . '/streaming/segment';
+        $authParams = 'username=' . urlencode($line['username']) . '&password=' . urlencode($line['password']);
 
+        // Prefer the live playlist that FFmpeg is writing (correct segment numbers and order)
+        $playlistPath = $this->segmentReader->getPlaylistPath($streamId);
+        if ($playlistPath && is_readable($playlistPath)) {
+            $content = file_get_contents($playlistPath);
+            if ($content !== false) {
+                $rewritten = $this->rewritePlaylistSegmentUrls($content, $streamId, $segmentBase, $authParams);
+                return response($rewritten, 200, [
+                    'Content-Type' => 'application/vnd.apple.mpegurl',
+                    'Cache-Control' => 'no-cache, no-store',
+                    'Access-Control-Allow-Origin' => '*',
+                ]);
+            }
+        }
+
+        // Fallback: static playlist (used when stream not started yet or no playlist file)
         $playlist = "#EXTM3U\n";
         $playlist .= "#EXT-X-VERSION:3\n";
         $playlist .= "#EXT-X-TARGETDURATION:10\n";
         $playlist .= "#EXT-X-MEDIA-SEQUENCE:0\n";
-
-        $segmentBase = "http://{$baseUrl}:{$port}/streaming/segment";
-        $authParams = "username={$line['username']}&password={$line['password']}";
-
         for ($i = 0; $i < 5; $i++) {
             $playlist .= "#EXTINF:10.0,\n";
             $playlist .= "{$segmentBase}/{$streamId}/{$i}.ts?{$authParams}\n";
@@ -59,6 +68,29 @@ class LiveDelivery
             'Cache-Control' => 'no-cache, no-store',
             'Access-Control-Allow-Origin' => '*',
         ]);
+    }
+
+    /**
+     * Rewrite segment URIs in an HLS playlist to point to our segment endpoint with auth.
+     */
+    private function rewritePlaylistSegmentUrls(string $playlistContent, int $streamId, string $segmentBase, string $authParams): string
+    {
+        $lines = explode("\n", $playlistContent);
+        $out = [];
+        foreach ($lines as $line) {
+            $line = rtrim($line, "\r");
+            if ($line === '' || str_starts_with($line, '#')) {
+                $out[] = $line;
+                continue;
+            }
+            // Segment URI (relative or absolute) -> our segment URL with auth
+            $segmentName = basename($line);
+            if (!str_ends_with($segmentName, '.ts')) {
+                $segmentName .= '.ts';
+            }
+            $out[] = "{$segmentBase}/{$streamId}/{$segmentName}?{$authParams}";
+        }
+        return implode("\n", $out);
     }
 
     private function serveTs(array $stream, array $line, Request $request): mixed

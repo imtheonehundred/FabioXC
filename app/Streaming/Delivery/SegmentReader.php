@@ -13,6 +13,7 @@ class SegmentReader
     public function __construct()
     {
         $this->searchPaths = [
+            storage_path('app/streaming'),  // FFmpeg StreamProcess writes here
             storage_path('app/streams'),
             '/tmp/streams',
             '/dev/shm/streams',

@@ -1,12 +1,25 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import Card from '@/Components/ui/Card.vue';
 import Button from '@/Components/ui/Button.vue';
 import StatusBadge from '@/Components/StatusBadge.vue';
-import { ArrowLeft, Pencil, Radio, Server, Tv } from 'lucide-vue-next';
+import { ArrowLeft, Pencil, Play, Square, Radio, Server, Tv } from 'lucide-vue-next';
 
-defineProps<{ stream: any }>();
+const props = defineProps<{ stream: any }>();
+
+const status = Number(props.stream.status);
+const isLive = props.stream.type === 'live' || props.stream.type === 'created';
+const canStart = isLive && (status === 0 || status === 3);
+const canStop = isLive && (status === 1 || status === 2);
+
+function startStream() {
+    router.post(`/admin/streams/${props.stream.id}/start`, {}, { preserveScroll: true });
+}
+
+function stopStream() {
+    router.post(`/admin/streams/${props.stream.id}/stop`, {}, { preserveScroll: true });
+}
 </script>
 
 <template>
@@ -19,9 +32,28 @@ defineProps<{ stream: any }>();
                 <Link href="/admin/streams" class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                     <ArrowLeft class="h-4 w-4" /> Back to Streams
                 </Link>
-                <Link :href="`/admin/streams/${stream.id}/edit`">
-                    <Button size="sm"><Pencil class="mr-1 h-4 w-4" /> Edit</Button>
-                </Link>
+                <div class="flex items-center gap-2">
+                    <Button
+                        v-if="canStart"
+                        size="sm"
+                        variant="default"
+                        :disabled="stream.status === 2 || Number(stream.status) === 2"
+                        @click="startStream"
+                    >
+                        <Play class="mr-1 h-4 w-4" /> Start Stream
+                    </Button>
+                    <Button
+                        v-if="canStop"
+                        size="sm"
+                        variant="destructive"
+                        @click="stopStream"
+                    >
+                        <Square class="mr-1 h-4 w-4" /> Stop Stream
+                    </Button>
+                    <Link :href="`/admin/streams/${stream.id}/edit`">
+                        <Button size="sm"><Pencil class="mr-1 h-4 w-4" /> Edit</Button>
+                    </Link>
+                </div>
             </div>
 
             <Card class="p-6">

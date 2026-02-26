@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Schedule;
 use App\Domain\Stream\Models\Stream;
+use App\Domain\Stream\StreamProcess;
 use App\Domain\Server\Models\Server;
 use App\Domain\Line\Models\Line;
 use App\Domain\Vod\Models\Movie;
@@ -14,13 +15,14 @@ use Illuminate\Support\Facades\Cache;
 Schedule::call(function () {
     $streams = Stream::where('admin_enabled', 1)->where('status', 1)->get();
     $autoRestart = DB::table('settings')->where('key', 'auto_restart_streams')->value('value');
+    $streamProcess = app(StreamProcess::class);
 
     foreach ($streams as $stream) {
         if ($stream->pid && function_exists('posix_kill') && !posix_kill($stream->pid, 0)) {
             Log::warning("StreamsCron: Stream #{$stream->id} PID {$stream->pid} dead");
             $stream->update(['status' => 3, 'pid' => null]);
-            if ($autoRestart) {
-                $stream->update(['status' => 1, 'started_at' => now()]);
+            if ($autoRestart && $stream->type !== 'radio') {
+                $streamProcess->start($stream);
             }
         }
     }

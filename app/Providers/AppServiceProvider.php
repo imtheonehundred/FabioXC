@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Modules\Core\EventDispatcher;
 use App\Modules\Core\ModuleLoader;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -16,6 +18,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->registerStreamingRateLimiter();
+
         $loader = $this->app->make(ModuleLoader::class);
         $loader->loadAll();
 
@@ -30,5 +34,12 @@ class AppServiceProvider extends ServiceProvider
                 $dispatcher->subscribe($event, $handler);
             }
         }
+    }
+
+    private function registerStreamingRateLimiter(): void
+    {
+        RateLimiter::for('streaming', function (\Illuminate\Http\Request $request) {
+            return Limit::perMinute(120)->by($request->ip());
+        });
     }
 }

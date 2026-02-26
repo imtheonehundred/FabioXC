@@ -23,6 +23,14 @@ class StreamProcess
      */
     public function start(Stream $stream): bool
     {
+        // Clear stuck "Starting" from a previous failed start (e.g. exception after setting status 2)
+        if ((int) $stream->status === 2) {
+            $pid = $stream->pid ? (int) $stream->pid : null;
+            if (!$pid || !$this->isPidRunning($pid)) {
+                $stream->update(['status' => 3, 'pid' => null]);
+            }
+        }
+
         $stream->update(['status' => 2, 'started_at' => now()]); // 2 = Starting
 
         $source = $stream->stream_source ?? '';
@@ -31,26 +39,29 @@ class StreamProcess
             mkdir($outputDir, 0755, true);
         }
 
-        $profile = new \App\Streaming\Codec\TranscodeProfile([
-            'video_codec' => 'copy',
-            'audio_codec' => 'copy',
-        ]);
-        $cmd = $this->ffmpegCommand->buildLiveTranscode($source, $outputDir, $profile);
-        $process = Process::fromShellCommandline($cmd);
-        $process->setTimeout(null);
-        $process->start();
+        try {
+            $profile = \App\Streaming\Codec\TranscodeProfile::passthrough();
+            $cmd = $this->ffmpegCommand->buildLiveTranscode($source, $outputDir, $profile);
+            $process = Process::fromShellCommandline($cmd);
+            $process->setTimeout(null);
+            $process->start();
 
-        $pid = $process->getPid();
-        $stream->update([
-            'pid' => $pid,
-            'status' => $pid ? 1 : 3, // 1 = Online, 3 = Error
-        ]);
+            $pid = $process->getPid();
+            $stream->update([
+                'pid' => $pid,
+                'status' => $pid ? 1 : 3, // 1 = Online, 3 = Error
+            ]);
 
-        if (!$pid) {
-            Log::warning("StreamProcess: failed to start stream {$stream->id}");
+            if (!$pid) {
+                Log::warning("StreamProcess: failed to start stream {$stream->id} (no PID)");
+                return false;
+            }
+            return true;
+        } catch (\Throwable $e) {
+            Log::error("StreamProcess: start failed for stream {$stream->id}", ['message' => $e->getMessage()]);
+            $stream->update(['status' => 3, 'pid' => null]);
             return false;
         }
-        return true;
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Domain\Stream\StreamService;
+use App\Domain\Stream\StreamProcess;
 use App\Domain\Stream\Models\Stream;
 use App\Domain\Server\Models\Server;
 use App\Domain\Epg\Models\Epg;
@@ -13,7 +14,8 @@ use Inertia\Inertia;
 class StreamController extends Controller
 {
     public function __construct(
-        private StreamService $streamService
+        private StreamService $streamService,
+        private StreamProcess $streamProcess
     ) {}
 
     public function index(Request $request)
@@ -105,6 +107,21 @@ class StreamController extends Controller
     {
         $this->streamService->delete($stream);
         return redirect()->route('admin.streams.index')->with('success', 'Stream deleted.');
+    }
+
+    public function start(Stream $stream)
+    {
+        if ($stream->type === 'radio') {
+            return back()->with('error', 'Radio streams do not use FFmpeg start.');
+        }
+        $ok = $this->streamProcess->start($stream);
+        return back()->with($ok ? 'success' : 'error', $ok ? 'Stream start requested.' : 'Failed to start stream (check logs).');
+    }
+
+    public function stop(Stream $stream)
+    {
+        $this->streamProcess->stop($stream);
+        return back()->with('success', 'Stream stopped.');
     }
 
     public function massAction(Request $request)

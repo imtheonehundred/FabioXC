@@ -35,6 +35,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
     Route::resource('streams', StreamController::class);
     Route::post('streams/mass-action', [StreamController::class, 'massAction'])->name('streams.mass-action');
+    Route::post('streams/{stream}/start', [StreamController::class, 'start'])->name('streams.start');
+    Route::post('streams/{stream}/stop', [StreamController::class, 'stop'])->name('streams.stop');
 
     Route::resource('categories', CategoryController::class);
 

@@ -26,6 +26,8 @@ const form = useForm({
     stream_icon: props.stream.stream_icon || '',
     notes: props.stream.notes || '',
     admin_enabled: Boolean(props.stream.admin_enabled),
+    tv_archive: Boolean(props.stream.tv_archive),
+    tv_archive_duration: Number(props.stream.tv_archive_duration) || 0,
 });
 
 function submit() {
@@ -110,6 +112,18 @@ function submit() {
                         <div class="flex items-center gap-2">
                             <input id="enabled" v-model="form.admin_enabled" type="checkbox" class="rounded border-input" />
                             <label for="enabled" class="text-sm font-medium cursor-pointer">Enabled</label>
+                        </div>
+
+                        <div class="space-y-3 sm:col-span-2 pt-2 border-t">
+                            <div class="flex items-center gap-2">
+                                <input id="tv_archive" v-model="form.tv_archive" type="checkbox" class="rounded border-input" />
+                                <label for="tv_archive" class="text-sm font-medium cursor-pointer">Enable catch-up (timeshift)</label>
+                            </div>
+                            <div v-show="form.tv_archive" class="pl-6 space-y-2">
+                                <label class="text-sm font-medium">Archive duration (hours)</label>
+                                <Input v-model.number="form.tv_archive_duration" type="number" min="0" max="720" placeholder="e.g. 24, 48, 72" class="max-w-[140px]" />
+                                <p v-if="form.errors.tv_archive_duration" class="text-xs text-destructive">{{ form.errors.tv_archive_duration }}</p>
+                            </div>
                         </div>
                     </div>
 

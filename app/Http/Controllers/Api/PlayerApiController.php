@@ -98,9 +98,9 @@ class PlayerApiController extends Controller
             'category_id' => (string) ($s->category_id ?? ''),
             'is_adult' => 0,
             'custom_sid' => null,
-            'tv_archive' => 0,
+            'tv_archive' => (int) ($s->tv_archive ?? 0),
             'direct_source' => '',
-            'tv_archive_duration' => 0,
+            'tv_archive_duration' => (int) ($s->tv_archive_duration ?? 0),
         ]);
 
         return response()->json($streams);
@@ -142,7 +142,7 @@ class PlayerApiController extends Controller
             'direct_source' => '',
         ]);
 
-        return response()->json($movies);
+        return response()->json($movies)->header('Cache-Control', 'public, max-age=60');
     }
 
     public function getVodInfo(Request $request): JsonResponse
@@ -219,7 +219,7 @@ class PlayerApiController extends Controller
             'tmdb_id' => $s->tmdb_id ?? '',
         ]);
 
-        return response()->json($series);
+        return response()->json($series)->header('Cache-Control', 'public, max-age=60');
     }
 
     public function getSeriesInfo(Request $request): JsonResponse
@@ -284,6 +284,82 @@ class PlayerApiController extends Controller
         return response()->json([
             'epg_listings' => [],
         ]);
+    }
+
+    /**
+     * Single endpoint for fast open of on-demand section in customer app.
+     * Returns VOD categories, VOD list, series categories, series list, and channels with catch-up in one response.
+     */
+    public function getOnDemandQuick(Request $request): JsonResponse
+    {
+        $limit = min((int) $request->input('limit', 100), 200);
+
+        $vodCategories = StreamCategory::where('category_type', 'movie')
+            ->orderBy('cat_order')
+            ->get()
+            ->map(fn ($c) => [
+                'category_id' => (string) $c->id,
+                'category_name' => $c->category_name,
+                'parent_id' => $c->parent_id ?? 0,
+            ]);
+
+        $vodStreams = Movie::where('admin_enabled', 1)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($m) => [
+                'num' => $m->id,
+                'name' => $m->stream_display_name,
+                'stream_type' => 'movie',
+                'stream_id' => $m->id,
+                'stream_icon' => $m->cover ?? '',
+                'category_id' => (string) ($m->category_id ?? ''),
+                'container_extension' => $m->container_extension ?? 'mp4',
+            ]);
+
+        $seriesCategories = StreamCategory::where('category_type', 'series')
+            ->orderBy('cat_order')
+            ->get()
+            ->map(fn ($c) => [
+                'category_id' => (string) $c->id,
+                'category_name' => $c->category_name,
+                'parent_id' => $c->parent_id ?? 0,
+            ]);
+
+        $series = Series::where('admin_enabled', 1)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($s) => [
+                'num' => $s->id,
+                'name' => $s->title,
+                'series_id' => $s->id,
+                'cover' => $s->cover ?? '',
+                'category_id' => (string) ($s->category_id ?? ''),
+            ]);
+
+        $liveWithArchive = Stream::where('type', 'live')
+            ->where('admin_enabled', 1)
+            ->where('tv_archive', true)
+            ->get(['id', 'stream_display_name', 'tv_archive', 'tv_archive_duration'])
+            ->map(fn ($s) => [
+                'stream_id' => $s->id,
+                'name' => $s->stream_display_name,
+                'tv_archive' => (int) $s->tv_archive,
+                'tv_archive_duration' => (int) ($s->tv_archive_duration ?? 0),
+            ]);
+
+        $response = response()->json([
+            'vod_categories' => $vodCategories,
+            'vod_streams' => $vodStreams,
+            'series_categories' => $seriesCategories,
+            'series' => $series,
+            'live_with_archive' => $liveWithArchive,
+        ]);
+
+        $response->header('Cache-Control', 'public, max-age=60');
+
+        return $response;
     }
 
     public function xmltv(Request $request)

@@ -90,4 +90,6 @@ Route::middleware(['auth', 'reseller'])->prefix('reseller')->name('reseller.')->
     Route::put('profile', [App\Http\Controllers\Reseller\ResellerProfileController::class, 'update'])->name('profile.update');
 });
 
+Route::get('/player', fn () => view('player'))->name('player');
+
 Route::redirect('/', '/admin');

@@ -3,30 +3,27 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Domain\Vod\MovieService;
 use App\Domain\Vod\Models\Movie;
-use App\Domain\Stream\Models\StreamCategory;
+use App\Domain\Vod\MovieRepository;
 use App\Domain\Server\Models\Server;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class MovieController extends Controller
 {
+    public function __construct(
+        private MovieService $movieService
+    ) {}
+
     public function index(Request $request)
     {
-        $query = Movie::with('category');
-        if ($search = $request->input('search')) {
-            $query->where('stream_display_name', 'like', "%{$search}%");
-        }
-        if ($request->filled('category_id')) $query->where('category_id', $request->input('category_id'));
-        if ($sort = $request->input('sort')) {
-            $query->orderBy($sort, $request->input('direction', 'asc'));
-        } else {
-            $query->orderByDesc('id');
-        }
-
         return Inertia::render('Admin/Movies/Index', [
-            'movies' => $query->paginate($request->input('per_page', 25))->withQueryString(),
-            'categories' => StreamCategory::where('category_type', 'movie')->orderBy('category_name')->get(['id', 'category_name']),
+            'movies' => $this->movieService->list(
+                $request->only(['search', 'sort', 'direction', 'category_id']),
+                (int) $request->input('per_page', 25)
+            ),
+            'categories' => $this->movieService->getCategories(),
             'filters' => $request->only(['search', 'sort', 'direction', 'category_id']),
         ]);
     }
@@ -34,8 +31,8 @@ class MovieController extends Controller
     public function create()
     {
         return Inertia::render('Admin/Movies/Create', [
-            'categories' => StreamCategory::where('category_type', 'movie')->orderBy('category_name')->get(['id', 'category_name']),
-            'servers' => Server::orderBy('server_name')->get(['id', 'server_name']),
+            'categories' => $this->movieService->getCategories(),
+            'servers' => MovieRepository::getServersList(),
         ]);
     }
 
@@ -52,8 +49,7 @@ class MovieController extends Controller
             'youtube_trailer' => 'nullable|string', 'tmdb_id' => 'nullable|string',
             'container_extension' => 'nullable|string', 'admin_enabled' => 'boolean',
         ]);
-        $data['added'] = now();
-        Movie::create($data);
+        $this->movieService->create($data);
         return redirect()->route('admin.movies.index')->with('success', 'Movie created.');
     }
 
@@ -61,8 +57,8 @@ class MovieController extends Controller
     {
         return Inertia::render('Admin/Movies/Edit', [
             'movie' => $movie,
-            'categories' => StreamCategory::where('category_type', 'movie')->orderBy('category_name')->get(['id', 'category_name']),
-            'servers' => Server::orderBy('server_name')->get(['id', 'server_name']),
+            'categories' => $this->movieService->getCategories(),
+            'servers' => MovieRepository::getServersList(),
         ]);
     }
 
@@ -79,24 +75,20 @@ class MovieController extends Controller
             'youtube_trailer' => 'nullable|string', 'tmdb_id' => 'nullable|string',
             'container_extension' => 'nullable|string', 'admin_enabled' => 'boolean',
         ]);
-        $movie->update($data);
+        $this->movieService->update($movie, $data);
         return redirect()->route('admin.movies.index')->with('success', 'Movie updated.');
     }
 
     public function destroy(Movie $movie)
     {
-        $movie->delete();
+        $this->movieService->delete($movie);
         return redirect()->route('admin.movies.index')->with('success', 'Movie deleted.');
     }
 
     public function massAction(Request $request)
     {
         $request->validate(['action' => 'required|in:delete,enable,disable', 'ids' => 'required|array', 'ids.*' => 'exists:movies,id']);
-        match ($request->input('action')) {
-            'delete' => Movie::whereIn('id', $request->input('ids'))->delete(),
-            'enable' => Movie::whereIn('id', $request->input('ids'))->update(['admin_enabled' => 1]),
-            'disable' => Movie::whereIn('id', $request->input('ids'))->update(['admin_enabled' => 0]),
-        };
-        return back()->with('success', ucfirst($request->input('action')) . " applied to " . count($request->input('ids')) . " movies.");
+        $count = $this->movieService->massAction($request->input('action'), $request->input('ids'));
+        return back()->with('success', ucfirst($request->input('action')) . " applied to {$count} movies.");
     }
 }

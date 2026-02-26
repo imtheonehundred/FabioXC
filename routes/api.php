@@ -18,6 +18,7 @@ Route::prefix('player')->group(function () {
     Route::get('get_series_info', [PlayerApiController::class, 'getSeriesInfo']);
     Route::get('get_vod_info', [PlayerApiController::class, 'getVodInfo']);
     Route::get('get_epg', [PlayerApiController::class, 'getEpg']);
+    Route::get('get_on_demand_quick', [PlayerApiController::class, 'getOnDemandQuick']);
     Route::get('xmltv.php', [PlayerApiController::class, 'xmltv']);
 });
 

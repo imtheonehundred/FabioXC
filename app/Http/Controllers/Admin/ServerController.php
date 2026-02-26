@@ -3,24 +3,24 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Domain\Server\ServerService;
 use App\Domain\Server\Models\Server;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ServerController extends Controller
 {
+    public function __construct(
+        private ServerService $serverService
+    ) {}
+
     public function index(Request $request)
     {
-        $query = Server::withCount('streams');
-        if ($search = $request->input('search')) $query->where('server_name', 'like', "%{$search}%");
-        if ($sort = $request->input('sort')) {
-            $query->orderBy($sort, $request->input('direction', 'asc'));
-        } else {
-            $query->orderByDesc('is_main')->orderBy('server_name');
-        }
-
         return Inertia::render('Admin/Servers/Index', [
-            'servers' => $query->paginate($request->input('per_page', 25))->withQueryString(),
+            'servers' => $this->serverService->list(
+                $request->only(['search', 'sort', 'direction']),
+                (int) $request->input('per_page', 25)
+            ),
             'filters' => $request->only(['search', 'sort', 'direction']),
         ]);
     }
@@ -39,7 +39,7 @@ class ServerController extends Controller
             'http_port' => 'required|integer|min:1|max:65535',
             'rtmp_port' => 'required|integer|min:1|max:65535',
         ]);
-        Server::create($data);
+        $this->serverService->create($data);
         return redirect()->route('admin.servers.index')->with('success', 'Server created.');
     }
 
@@ -63,13 +63,13 @@ class ServerController extends Controller
             'http_port' => 'required|integer|min:1|max:65535',
             'rtmp_port' => 'required|integer|min:1|max:65535',
         ]);
-        $server->update($data);
+        $this->serverService->update($server, $data);
         return redirect()->route('admin.servers.index')->with('success', 'Server updated.');
     }
 
     public function destroy(Server $server)
     {
-        $server->delete();
+        $this->serverService->delete($server);
         return redirect()->route('admin.servers.index')->with('success', 'Server deleted.');
     }
 }

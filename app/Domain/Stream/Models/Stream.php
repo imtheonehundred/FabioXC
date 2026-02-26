@@ -17,6 +17,7 @@ class Stream extends Model
             'started_at' => 'datetime',
             'added' => 'datetime',
             'admin_enabled' => 'boolean',
+            'tv_archive' => 'boolean',
         ];
     }
 

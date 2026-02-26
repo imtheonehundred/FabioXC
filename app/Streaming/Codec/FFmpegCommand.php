@@ -26,6 +26,15 @@ class FFmpegCommand
         if (isset($options['timeout'])) {
             $args[] = "-timeout {$options['timeout']}";
         }
+        if ($this->isHttpSource($source)) {
+            $userAgent = config('streaming.outbound_user_agent', 'IPTV/1.0 (compatible; set-top player)');
+            $args[] = '-user_agent ' . $this->escapeShellArg($userAgent);
+            $headers = config('streaming.outbound_headers', []);
+            if (is_array($headers) && $headers !== []) {
+                $headersStr = implode("\r\n", $headers);
+                $args[] = '-headers ' . $this->escapeShellArg($headersStr);
+            }
+        }
         $args[] = "-i \"{$source}\"";
 
         // Video codec
@@ -173,5 +182,15 @@ class FFmpegCommand
             return round((int) $parts[0] / (int) $parts[1], 2);
         }
         return (float) $rational;
+    }
+
+    private function isHttpSource(string $source): bool
+    {
+        return str_starts_with($source, 'http://') || str_starts_with($source, 'https://');
+    }
+
+    private function escapeShellArg(string $value): string
+    {
+        return '"' . addcslashes($value, '"\\') . '"';
     }
 }

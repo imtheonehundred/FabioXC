@@ -3,24 +3,24 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Domain\Bouquet\BouquetService;
 use App\Domain\Bouquet\Models\Bouquet;
-use App\Domain\Stream\Models\Stream;
-use App\Domain\Vod\Models\Movie;
-use App\Domain\Vod\Models\Series;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class BouquetController extends Controller
 {
+    public function __construct(
+        private BouquetService $bouquetService
+    ) {}
+
     public function index(Request $request)
     {
-        $query = Bouquet::query();
-        if ($search = $request->input('search')) $query->where('bouquet_name', 'like', "%{$search}%");
-        if ($sort = $request->input('sort')) $query->orderBy($sort, $request->input('direction', 'asc'));
-        else $query->orderBy('bouquet_order');
-
         return Inertia::render('Admin/Bouquets/Index', [
-            'bouquets' => $query->paginate($request->input('per_page', 25))->withQueryString(),
+            'bouquets' => $this->bouquetService->list(
+                $request->only(['search', 'sort', 'direction']),
+                (int) $request->input('per_page', 25)
+            ),
             'filters' => $request->only(['search', 'sort', 'direction']),
         ]);
     }
@@ -28,9 +28,9 @@ class BouquetController extends Controller
     public function create()
     {
         return Inertia::render('Admin/Bouquets/Create', [
-            'streams' => Stream::where('admin_enabled', 1)->orderBy('stream_display_name')->get(['id', 'stream_display_name', 'type']),
-            'movies' => Movie::where('admin_enabled', 1)->orderBy('stream_display_name')->get(['id', 'stream_display_name']),
-            'series' => Series::where('admin_enabled', 1)->orderBy('title')->get(['id', 'title']),
+            'streams' => $this->bouquetService->getStreams(),
+            'movies' => $this->bouquetService->getMovies(),
+            'series' => $this->bouquetService->getSeries(),
         ]);
     }
 
@@ -42,7 +42,7 @@ class BouquetController extends Controller
             'bouquet_series' => 'nullable|array', 'bouquet_radios' => 'nullable|array',
             'bouquet_order' => 'integer|min:0',
         ]);
-        Bouquet::create($data);
+        $this->bouquetService->create($data);
         return redirect()->route('admin.bouquets.index')->with('success', 'Bouquet created.');
     }
 
@@ -50,9 +50,9 @@ class BouquetController extends Controller
     {
         return Inertia::render('Admin/Bouquets/Edit', [
             'bouquet' => $bouquet,
-            'streams' => Stream::where('admin_enabled', 1)->orderBy('stream_display_name')->get(['id', 'stream_display_name', 'type']),
-            'movies' => Movie::where('admin_enabled', 1)->orderBy('stream_display_name')->get(['id', 'stream_display_name']),
-            'series' => Series::where('admin_enabled', 1)->orderBy('title')->get(['id', 'title']),
+            'streams' => $this->bouquetService->getStreams(),
+            'movies' => $this->bouquetService->getMovies(),
+            'series' => $this->bouquetService->getSeries(),
         ]);
     }
 
@@ -64,13 +64,13 @@ class BouquetController extends Controller
             'bouquet_series' => 'nullable|array', 'bouquet_radios' => 'nullable|array',
             'bouquet_order' => 'integer|min:0',
         ]);
-        $bouquet->update($data);
+        $this->bouquetService->update($bouquet, $data);
         return redirect()->route('admin.bouquets.index')->with('success', 'Bouquet updated.');
     }
 
     public function destroy(Bouquet $bouquet)
     {
-        $bouquet->delete();
+        $this->bouquetService->delete($bouquet);
         return redirect()->route('admin.bouquets.index')->with('success', 'Bouquet deleted.');
     }
 }
